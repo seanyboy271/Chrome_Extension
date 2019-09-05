@@ -16,7 +16,7 @@ document.getElementById("button").onclick = function(){
 }
 
 function addURL(urlList){
-    chrome.tabs.query({'active': true, 'windowId': chrome.windows.WINDOW_ID_CURRENT},
+    chrome.tabs.query({'active': true, 'currentWindow': true},
    function(tabs){
       alert(tabs[0].url);
    }
