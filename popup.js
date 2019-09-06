@@ -1,49 +1,63 @@
-<<<<<<< HEAD
-addURL()
-=======
 var list = []
->>>>>>> b930d706830ca9e7c28da952cd994baa156b6887
+grabList()
+
 var start = new Date();
-// Do things here
+
+//setTimeout(function () {alert("TIMEOUT")}, 5000);
+
 var finish = new Date();
 var difference = new Date();
 difference.setTime(finish.getTime() - start.getTime());
+difference = difference.getMilliseconds()
 
 
-<<<<<<< HEAD
+function clearStorage(){
+    chrome.storage.sync.clear()
+}
+
 function addURL() {
+    grabList()
+
     chrome.tabs.query({ 'active': true, 'currentWindow': true },
         function (tabs) {
-            chrome.storage.sync.set({"url": tabs[0].url, "time": difference}, function(){
-                document.getElementById("status").innerHTML  = "we did it"
+            // alert("DIFFERENCE = " + difference)
+            var node = { "url": tabs[0].url, "time": difference } //Create an object to hold the url and the time
+
+            if (!list) {
+                list = []
+            }
+
+            list.push(node) //Add these objects to a list
+
+
+            chrome.storage.sync.set({ "urlList": list }, function () { //Store the list as urlList
+                document.getElementById("status").innerHTML = "size of list: " + list.length;
             })
         }
     );
-=======
->>>>>>> b930d706830ca9e7c28da952cd994baa156b6887
+}
+
+function grabList() {
+    chrome.storage.sync.get("urlList", function (result) { //Grab the list from storage
+        list = result.urlList
+    });
+}
 
 
 document.getElementById("button").onclick = function () {
-<<<<<<< HEAD
     var div = document.getElementById('hello');
+    div.innerHTML = ""
     addURL();
 
-    chrome.storage.sync.get(["url"], function(result) { //This does work 
-        div.innerHTML = "URL: " + result.url + "<br> Time: " + result.difference
-      });
+    var i = 0
+    for(i; i < list.length; i++){
+        div.innerHTML += "URL: " + list[i].url + "<br> Time: " + list[i].time + "<br><br>"
+    }
 
-=======
-    addURL(list);
-    document.getElementById("hello").innerText = list
-    var div = document.getElementById('hello');
-    div.innerHTML = div.innerHTML + "<br> Difference: " + difference.getMilliseconds()
->>>>>>> b930d706830ca9e7c28da952cd994baa156b6887
 }
 
-function addURL(urlList) {
-    chrome.tabs.query({ 'active': true, 'currentWindow': true },
-        function (tabs) {
-            alert(tabs[0].url);
-        }
-    );
+document.getElementById('clearStorage').onclick = function(){
+    clearStorage()
+    var div = document.getElementById('hello');
+    div.innerHTML = ""
 }
