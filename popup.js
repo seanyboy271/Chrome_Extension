@@ -1,88 +1,6 @@
-// var list = []
-// grabList()
-
-// var start = new Date();
-
-// var finish = new Date();
-// var difference = new Date();
-// difference.setTime(finish.getTime() - start.getTime());
-// difference = difference.getMilliseconds()
-
-
- function clearStorage() {
-     chrome.storage.sync.clear()
- }
-
-// function addURL() {
-//     grabList()
-
-//     chrome.tabs.query({ 'active': true, 'currentWindow': true },
-//         function (tabs) {
-
-//             var url = tabs[0].url
-
-//             var node = { "url": url, "time": difference } //Create an object to hold the url and the time
-
-//             if (!list) {
-//                 list = []
-//             }
-
-//             if (!isRepeat(url)) {
-//                 list.push(node) //Add these objects to a list
-
-//                 chrome.storage.sync.remove("urlList"); //Remove the existing list
-
-//                 chrome.storage.sync.set({ "urlList": list }, function () { //Store the list as urlList
-//                     document.getElementById("status").innerHTML = "size of list: " + list.length;
-//                 })
-//             }
-//             //Else dont add anything to the list
-
-//         }
-
-//     );
-// }
-
-// function isRepeat(url) {
-//     var existingList = []
-
-
-//     for (var i = 0; i < list.length; i++) {
-//         if (!existingList.includes(list[i].url)) {
-//             existingList.push(list[i].url)
-//         }
-//     }
-
-//     if (existingList.includes(url)) {
-//         document.getElementById("status").innerHTML = "Element is already in the list <br> Current URL: " + url + " Current List: " + existingList.toString();
-//         return true;
-//     }
-//     else {
-//         return false;
-//     }
-// }
-
-// function grabList() {
-//     chrome.storage.sync.get("urlList", function (result) { //Grab the list from storage
-//         if (result.urlList != null) {
-//             list = result.urlList
-//         }
-//         else {
-//             document.getElementById("status").innerHTML = "Stored list is undefined";
-//         }
-//     });
-// }
-
-
-// document.getElementById("button").onclick = function () {
-//     var div = document.getElementById('hello');
-//     div.innerHTML = ""
-//     var i = 0
-//     for (i; i < list.length; i++) {
-//         div.innerHTML += "URL: " + list[i].url + "<br> Time: " + list[i].time + "<br><br>"
-//     }
-
-// }
+function clearStorage() {
+    chrome.storage.sync.clear()
+}
 
 document.getElementById('clearStorage').onclick = function () {
     clearStorage()
@@ -91,3 +9,72 @@ document.getElementById('clearStorage').onclick = function () {
     div.innerHTML = ""
     stat.innerHTML = "List cleared."
 }
+
+chrome.runtime.sendMessage({ greeting: "plsCalculateThanks" }, function (response) {
+
+
+    chrome.storage.sync.get('urlList', function (result) {
+        var hello = document.getElementById("hello");
+        
+        //Build the table to show in the popup
+        if(response.status != "not happening chief"){
+            var list = response.status
+            var table = document.createElement("table")
+            table.className = "table table-striped table-dark"
+            var tableHead = document.createElement("thead")
+            var headRow = document.createElement("tr")
+            var websiteHeader = document.createElement("th")
+            var timeHeader = document.createElement("th")
+
+        
+            var textnode = document.createTextNode("Website")
+            websiteHeader.appendChild(textnode)
+            headRow.appendChild(websiteHeader)
+            textnode = document.createTextNode("Time")
+            timeHeader.appendChild(textnode)
+            headRow.appendChild(timeHeader)
+            tableHead.appendChild(headRow)
+            table.appendChild(tableHead)
+            
+
+            
+                for (var i = 0; i < list.length; i++) {
+
+
+                    var time = new Date(list[i].time)
+                    var hours = time.getUTCHours();
+                    var minutes = time.getUTCMinutes();
+                    var seconds = time.getUTCSeconds();
+                    var milliseconds = time.getUTCMilliseconds();
+                    var timeString = hours + " Hours   " + minutes + " Minutes    " + seconds + " Seconds     " + milliseconds + " Milliseconds     ";
+
+
+
+                    var row = document.createElement("tr")
+                    var cell = document.createElement("td")
+                    textNode = document.createTextNode(list[i].url)
+                    cell.appendChild(textNode)
+                    row.appendChild(cell)
+
+                    cell = document.createElement("td")
+                    textNode = document.createTextNode(timeString)
+                    cell.appendChild(textNode)
+                    row.appendChild(cell)
+                    table.appendChild(row)
+
+                }
+
+                hello.appendChild(table)
+
+                table.cellSpacing = "10px"
+                table.cellPadding = "10px"
+            
+            }
+            else {
+                hello.innerHTML = "No Data to show right now"
+        }
+    })
+});
+
+
+

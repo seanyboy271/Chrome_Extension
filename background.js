@@ -1,4 +1,4 @@
-chrome.webNavigation.onCompleted.addListener(function (tab) {
+chrome.webNavigation.onBeforeNavigate.addListener(function (tab) {
     var list = []
 
     if (tab.frameId == 0) { //parent frame
@@ -12,7 +12,7 @@ chrome.tabs.onRemoved.addListener(function (tabID) {
     //this will return a tabID
     var currentTime = new Date();
     currentTime = currentTime.getTime()
-   // alert("TAB CLOSED: " + tabID)
+
 
     chrome.storage.sync.get("urlList", function (response) { //Grab the list from storage
         if (response.urlList != null && response.urlList.length != 0) {
@@ -22,32 +22,40 @@ chrome.tabs.onRemoved.addListener(function (tabID) {
 
             searchTabId(tabID, list, closedURLNode.url) //Remove the tabID from the node
 
-          //  alert("THE CLOSED NODE URL IS " + closedURLNode.url)
 
-            if(closedURLNode.tabID.length == 0){ //No tabs open with this url anymore
-                alert(closedURLNode.tabID.toString() +"   " +  closedURLNode.url)
+            if (closedURLNode.tabID.length == 0) { //No tabs open with this url anymore
                 calcTime(list, closedURLNode.url); //Calculate the time
-              //  alert("Result from calcTime. ClosedURLNode.URL = " + closedURLNode.url + "    node Time:  " + closedURLNode.time)
             }
 
-            else{
+            else {
                 alert("url still exists" + closedURLNode.url + " number of tabs still open with this url: " + closedURLNode.tabID.length);
                 //URL still exists in another tab
             }
 
             //we should now be able to calculate the time and update the list
-
-            chrome.storage.sync.set({ "urlList": list }, function () { //Store the list as urlList
-              //  alert("New list pushed to storage: " + list.toString())
-            })
+            chrome.storage.sync.set({ "urlList": list })
         }
         else {
-           // alert("list is null or empty");
             list = []
         }
     });
 
 })
+
+
+chrome.runtime.onMessage.addListener(
+    function (request, sender, sendResponse) {
+        chrome.storage.sync.get('urlList', function (response) {
+            if (response.urlList) {
+                calcAllTimes(response.urlList)
+                sendResponse({ status: response.urlList })
+            }
+            else {
+                sendResponse({ status: "not happening chief" })
+            }
+        })
+        return true
+    });
 
 
 //Good way to calculate time would be to just grab the current time the page is loaded
@@ -67,19 +75,50 @@ chrome.tabs.onRemoved.addListener(function (tabID) {
 //Need to figure out how to calucaltw timw now
 //I think that there should be 1 time vairbale, currentTime that all of the times in the program are based off of at each instant this is called
 
+//This is used to calculate the "open time" of all open websites.
+//Used by popup.js to update the display when the user clicks on it
+function calcAllTimes(list) {
+
+    for (var i = 0; i < list.length; i++) {
+        var node = list[i]
+        if (node.tabID.length > 0) { //If the tab is currently open
+
+            var startTime = node.startTime
+            var stopTime = new Date()
+            var difference = new Date()
+            difference.setTime(stopTime.getTime() - startTime);
+            difference = difference.getTime()
+
+            node.time += difference
+
+            var time = new Date(difference)
+            var hours = time.getUTCHours();
+            var minutes = time.getUTCMinutes();
+            var seconds = time.getUTCSeconds();
+            var milliseconds = time.getUTCMilliseconds();
+            var timeString = hours + " Hours   " + minutes + " Minutes    " + seconds + " Seconds     " + milliseconds + " Milliseconds     ";
+
+
+            node.startTime = stopTime.getTime()
+
+            chrome.storage.sync.set({ "urlList": list })
+        }
+    }
+}
+
+//Finds the urlNode which was closed
 function findClosedURLNode(tabID, list) {
     var node;
     for (var i = 0; i < list.length; i++) {
         node = list[i]
-        //alert("Current NODE: " + node.url + "Current NOde LIST: " + node.tabID)
         if (node.tabID.includes(tabID)) {
-            //alert("closedURLNODe found a urlNOde: " + node.url)
             return node
         }
     }
     return false
 }
 
+//Clears chrome storage
 function clearStorage(list) {
     chrome.storage.sync.clear()
     list = []
@@ -87,11 +126,10 @@ function clearStorage(list) {
 
 //Returns the index of the url's Node in the list
 function nodeIndex(list, url) {
-    //alert( "Node INdex url + listlength" +  list.length + "  " + url)
 
     for (var i = 0; i < list.length; i++) {
         if (list[i].url == url) {
-            
+
             return i;
         }
     }
@@ -99,6 +137,8 @@ function nodeIndex(list, url) {
 }
 
 //This function is used to make sure that no other url shares the given tabID
+//If the tabID is found in any node, it is deleted.
+//The tabID is then added back by addURL
 function searchTabId(tabID, list, url) {
 
     //If this causes a node to have a tabID List of size 0, then we should calculate the total time that it was open
@@ -106,11 +146,8 @@ function searchTabId(tabID, list, url) {
         var tabIdList = list[i].tabID
         if (tabIdList.includes(tabID)) {
             //Remove it from the list
-            //alert("tabID found in tabIDList at position " + tabIdList.indexOf(tabID) + " in urlNode " + list[i].url + "   Prev List" + tabIdList.toString())
             tabIdList.splice(tabIdList.indexOf(tabID), 1);
-           // alert("aFTER Removal:  " + tabIdList.toString())
-            if(tabIdList.length == 0 && list[i].url != url){ //You have changed url's within the same tab, no other tab contains the old url, and it is not a brand new url
-            //alert(list + "    " +  url)
+            if (tabIdList.length == 0 && list[i].url != url) { //You have changed url's within the same tab, no other tab contains the old url, and it is not a brand new url
                 calcTime(list, list[i].url)
             }
         }
@@ -118,16 +155,15 @@ function searchTabId(tabID, list, url) {
 
 }
 
+//This function is responsible for retrieving the urlList from chrome storage, and calling addURL
 function grabList(list, startTime) {
     chrome.storage.sync.get("urlList", function (response) { //Grab the list from storage
         if (response.urlList != null && response.urlList.length != 0) {
-           // alert("List is not null or empty" + response.urlList.toString())
             list = response.urlList;
 
             addURL(list, startTime)
         }
         else {
-            //alert("list is null or empty");
             list = []
             addURL(list, startTime);
         }
@@ -136,25 +172,18 @@ function grabList(list, startTime) {
 }
 
 
-function calcTime(list, url){
-   // alert("Now calculating time.Passed in URL = " + url);
+//This function will take in the urlList, and the url that it is searching for
+// It will check to see if there are any tabs open with given url
+//If not, it will calculate the time the page was open, update the time, and save the list. 
+//Note, this does not update the start time, since when the url is opened again, its start time will be updated by addURL
+function calcTime(list, url) {
 
     var index = nodeIndex(list, url);
-    //alert("Index"+  index)
-
-
     var stopTime = new Date()
-
     var node = list[index]
     var startTime = node.startTime
 
-    if(node.tabID.length != 0){
-       // alert("Given URL still has tabID list of length != 0")
-    }
-    else{
-        //alert("if you are seeing this, there should be no other tabs open with the previous/closed url. AKA This URl: " + url + " Should not be open anywhere");
-        //alert("startTime type = " + typeof(startTime))
-        //node.time +=  (time - startTime.getTime());
+    if (node.tabID.length == 0) {
 
         var difference = new Date()
         difference.setTime(stopTime.getTime() - startTime);
@@ -169,38 +198,33 @@ function calcTime(list, url){
         var milliseconds = time.getUTCMilliseconds();
         var timeString = hours + " Hours   " + minutes + " Minutes    " + seconds + " Seconds     " + milliseconds + " Milliseconds     ";
 
-        alert(timeString + "   " + node.time);
-
-        chrome.storage.sync.set({ "urlList": list }, function () { //Store the list as urlList
-            //alert("New list pushed to storage: " + list.toString())
-        })
+        chrome.storage.sync.set({ "urlList": list })
 
     }
 
-} 
+}
 
-
+//Determines if the url already exists is the given list
 function isRepeat(url, list) {
     var existingList = []
 
-    for (var i = 0; i < list.length; i++) {
+    for (var i = 0; i < list.length; i++) { //Set up the list of existing url's
         if (!existingList.includes(list[i].url)) {
             existingList.push(list[i].url)
         }
     }
 
     if (existingList.includes(url)) {
-       // alert("url already included in list: Existing list:  " + existingList.toString())
         return true;
     }
     else {
-       // alert("url not included in list Existing list:  " + existingList.toString())
         return false;
     }
 }
 
+//This function is reponsible for adding and updating the URL list
+// It essentially states "if this already exists, update it. If it doesnt already exist, add it to the list"
 function addURL(list, startTime) {
-    // list = grabList();
 
     chrome.tabs.query({ 'active': true, 'currentWindow': true },
         function (tabs) {
@@ -221,66 +245,30 @@ function addURL(list, startTime) {
 
                 if (!isRepeat(url, list)) { //Different url, push the node into the list
 
-                    var stopTime = new Date() //This is not correct, we cant assume that it is stopping
-                    var difference = new Date()
-
-
-                    difference.setTime(stopTime.getTime() - startTime.getTime());
-                    difference = difference.getTime()
-
-                    var time = new Date(difference)
-                    var hours = time.getUTCHours();
-                    var minutes = time.getUTCMinutes();
-                    var seconds = time.getUTCSeconds();
-                    var milliseconds = time.getUTCMilliseconds();
-                    var timeString = hours + " Hours   " + minutes + " Minutes    " + seconds + " Seconds     " + milliseconds + " Milliseconds     ";
-
-                    if (list.length > 0) {
-                       // alert("time spent on " + list[list.length - 1].url + ":    " + timeString)
-                    }
-
                     var node = { "url": url, "time": 0, "startTime": startTime.getTime(), "tabID": [tabID] } //Create an object to hold the url, the total time, and the start time which is updated each time they visit the site
-
-                 //   alert("Before pushing node: " + list.toString())
 
                     list.push(node) //Add these objects to a list
 
-                    //alert(node.tabID.toString())
-                   // alert("Node added to list: " + list.toString())
-
                     chrome.storage.sync.remove("urlList"); //Remove the existing list
 
-                    chrome.storage.sync.set({ "urlList": list }, function () { //Store the list as urlList
-                        //alert("New list pushed to storage: " + list.toString())
-                        //                    document.getElementById("status").innerHTML = "size of list: " + list.length;
-                    })
+                    chrome.storage.sync.set({ "urlList": list })
                 }
 
                 else { //Url already exists. Check it's tabID list to see if this is a new tab w/ same url
-                    var index = nodeIndex(list,url);
+                    var index = nodeIndex(list, url);
                     var node = list[index]
                     var tabIDList = node.tabID
 
-                    if(tabIDList.length == 0){
+                    if (tabIDList.length == 0) {
                         //tab previousuly existed but did not have anohter tab open. update start time
                         node.startTime = startTime.getTime()
                     }
-
-                    //alert("List: " + list.toString())
-                    //alert("Prev tabIDList:  " + tabIDList)
                     tabIDList.push(tabID); //Add the current tab id to the existing url.
-                    //alert("New tabID List:  " + tabIDList.toString())
 
-                    chrome.storage.sync.set({ "urlList": list }, function () { //Store the list as urlList
-                        //alert("New list pushed to storage: " + list.toString())
-                    })
+                    chrome.storage.sync.set({ "urlList": list })
 
-                    //alert("Current url is a repeat and was updated");
                 }
             }
-            //Else dont add anything to the list
-
         }
-
     );
 }
