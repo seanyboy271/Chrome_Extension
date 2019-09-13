@@ -4,10 +4,8 @@ function clearStorage() {
 
 document.getElementById('clearStorage').onclick = function () {
     clearStorage()
-    var stat = document.getElementById("status")
     var div = document.getElementById('hello');
     div.innerHTML = ""
-    stat.innerHTML = "List cleared."
 }
 
 chrome.runtime.sendMessage({ greeting: "plsCalculateThanks" }, function (response) {
